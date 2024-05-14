@@ -1,23 +1,76 @@
 <?php
 
 // task 1
-function elementStart($parser, string $name, array $attrs): void {
-    echo "<$name>";
-}
+class TableParser {
+    private DOMDocument $dom;
+    private DOMElement $bodyRoot;
+    private DOMElement | null $currentTable = null;
 
-function elementEnd($parser, string $name): void {
-    echo "</$name>";
-}
+    function __construct() {
+        $this->dom = new DOMDocument();
+        $html = $this->dom->createElement("html");
+        $head = $this->dom->createElement("head");
 
-function elementContent($parser, string $data): void {
-    echo $data;
+        $title = $this->dom->createElement("title");
+        $title->nodeValue = "Lb4";
+        $head->append($title);
+
+        $style = $this->dom->createElement("style");
+        $style->nodeValue = "table, td { border: 1px solid black; }";
+        $head->append($style);
+
+        $this->bodyRoot = $this->dom->createElement("body");
+
+        $html->append($head, $this->bodyRoot);
+        $this->dom->append($html);
+    }
+
+    private function writeTable(string $type, string $value): void {
+        if($this->currentTable != null) {
+            $row = $this->dom->createElement("tr");
+            $typeTd = $this->dom->createElement("td");
+            $nameTd = $this->dom->createElement("td");
+
+            $typeTd->nodeValue = $type;
+            $nameTd->nodeValue = $value;
+
+            $row->append($typeTd, $nameTd);
+            $this->currentTable->append($row);
+        }
+    }
+
+    function elementStart($parser, string $name, array $attrs): void {
+        if($name === "TABLE") {
+            $this->currentTable = $this->dom->createElement("table");
+            $this->bodyRoot->append($this->currentTable);
+        }
+
+        $this->writeTable("Element start", $name);
+    }
+
+    function elementEnd($parser, string $name): void {
+        $this->writeTable("Element end", $name);
+
+        if($name === "TABLE") {
+            $this->currentTable = null;
+        }
+    }
+
+    function elementContent($parser, string $data): void {
+        $this->writeTable("Element content", $data);
+    }
+
+    function save(string $filename): void {
+        $this->dom->save($filename);
+    }
 }
 
 $parser = xml_parser_create();
+$table = new TableParser();
 
 // task 2
-xml_set_element_handler($parser, "elementStart", "elementEnd");
-xml_set_character_data_handler($parser, "elementContent");
+xml_set_element_handler($parser, array($table, "elementStart"), array($table, "elementEnd"));
+xml_set_character_data_handler($parser, array($table, "elementContent"));
 
 // task 3 ??
 $xml_data = "<table><tr><td>Row 1, Cell 1</td><td>Row 1, Cell 2</td></tr><tr><td>Row 2, Cell 1</td><td>Row 2, Cell 2</td></tr></table>";
@@ -27,6 +80,8 @@ if (!xml_parse($parser, $xml_data, true)) {
         xml_error_string(xml_get_error_code($parser)),
         xml_get_current_line_number($parser)));
 }
+
+$table->save("idk.html");
 echo "\n\n";
 
 // task 4
